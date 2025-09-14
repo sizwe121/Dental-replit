@@ -1,0 +1,7 @@
+{
+  "name": "S&P Smiles Co. - Practice Management",
+  "description": "A dental practice management application with AI-powered features.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

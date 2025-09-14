@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S&P Smiles Co. - Practice Management</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for a clean look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Icon Library -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for BI Dashboard -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        #chart .tooth-surface { stroke-width: 1.5px; stroke: #4b5563; fill: #ffffff; cursor: pointer; transition: all 0.2s ease-in-out; }
+        #chart .tooth-surface:hover { stroke: #3b82f6; stroke-width: 2.5px; }
+        #chart .tooth-surface.sound { fill: #ffffff; }
+        #chart .tooth-surface.caries { fill: #c91c1c; } /* Brighter Red for Caries */
+        #chart .tooth-surface.amalgam { fill: #9ca3af; }
+        #chart .tooth-surface.composite { fill: #a5f3fc; }
+        #chart .tooth-surface.glass-ionomer { fill: #fde68a; }
+        #chart .tooth-surface.gold { fill: #facc15; }
+        #chart .tooth-surface.sealant { fill: url(#sealant-pattern); stroke: #6ee7b7; }
+        #chart .tooth-group.missing > *, #chart .tooth-group.bridge-pontic > * { opacity: 0.2; }
+        #chart .tooth-group.impacted .tooth-surface { stroke-dasharray: 4; stroke: #c084fc; }
+        #chart .tooth-group.crown .tooth-surface { fill: #facc15; }
+        #chart .tooth-group.implant .tooth-surface { fill: #a78bfa; }
+        .condition-btn { transition: all 0.2s ease-in-out; color: #1f2937; }
+        .condition-btn:hover { transform: translateY(-2px); }
+        .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .overlay-marker { pointer-events: none; stroke-width: 3; }
+        .rct-line { stroke: #ef4444; }
+        .missing-cross, .root-fragment-cross { stroke: #ef4444; }
+        .tbe-lines { stroke: #e11d48; }
+        .unerupted-circle { stroke: #3b82f6; fill: none; }
+        .partially-erupted-circle { stroke: #3b82f6; fill: none; stroke-dasharray: 5; }
+        .fracture-line { stroke: #f97316; fill: none; }
+        .bridge-pontic-line { stroke: #4b5563; stroke-width: 4; }
+        .modal-overlay { transition: opacity 0.3s ease; }
+        #ai-mic-btn.listening { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+        #ai-log { scroll-behavior: smooth; }
+        #ai-log p { margin-bottom: 0.5rem; padding: 0.5rem; border-radius: 0.5rem; word-break: break-word; }
+        #ai-log .user-log { background-color: #e0e7ff; }
+        #ai-log .interim-log { background-color: #e0e7ff; color: #6b7280; }
+        #ai-log .ai-log { background-color: #f3f4f6; }
+        #ai-log .ai-action { background-color: #dcfce7; color: #166534; font-style: italic; }
+        #ai-log .ai-error { background-color: #fee2e2; }
+        .snapshot-active { background-color: #dbeafe; color: #1e40af; }
+        .tab-btn.active { border-color: #4f46e5; color: #4f46e5; font-weight: 600; }
+        .tab-panel { animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Styles for the new Periodontal Chart */
+        .perio-grid { display: grid; gap: 1px; font-size: 0.7rem; background-color: #d1d5db; border: 1px solid #d1d5db; }
+        .perio-cell { position: relative; background-color: #fff; padding: 2px; display: flex; align-items: center; justify-content: center; }
+        .perio-tooth-header { text-align: center; font-weight: 600; }
+        .perio-label { text-align: right; padding-right: 8px; font-weight: 500; background-color: #f9fafb; }
+        .perio-input { width: 100%; height: 100%; text-align: center; border: none; background: transparent; font-size: 0.75rem; padding: 2px 0; transition: background-color 0.2s; }
+        .perio-input:focus { outline: 1px solid #4f46e5; }
+        .perio-checkbox { width: 0.75rem; height: 0.75rem; }
+        .perio-cal { font-weight: 600; color: #1d4ed8; }
+        .perio-input.healthy-pd { background-color: #bae6fd !important; } /* Blue for healthy probing depth */
+        .perio-input.high-pd { background-color: #fecaca !important; } /* Red for high probing depth */
+        .perio-input.recession { background-color: #fed7aa !important; } /* Orange for recession */
+        .quick-btn { padding: 2px 6px; font-size: 0.7rem; background-color: #e5e7eb; border-radius: 0.25rem; margin-right: 4px; border: 1px solid #d1d5db; cursor: pointer;}
+        .quick-btn:hover { background-color: #d1d5db; }
+        .perio-cell.missing { background-color: #e5e7eb; }
+        .perio-cell.missing input { visibility: hidden; }
+        
+        .comparison-change { position: absolute; top: 1px; right: 2px; font-size: 0.6rem; font-weight: bold; line-height: 1; text-shadow: 0 0 2px white; }
+        .change-worse { color: #ef4444; }
+        .change-better { color: #22c55e; }
+        .bop-indicator::after { content: '●'; color: #ef4444; position: absolute; top: 0px; left: 2px; font-size: 0.8rem; line-height: 1; }
+        .pi-indicator::after { content: '●'; color: #3b82f6; position: absolute; top: 0px; left: 2px; font-size: 0.8rem; line-height: 1; }
+
+        .outreach-toggle:checked ~ .dot { transform: translateX(100%); background-color: #4f46e5; }
+        
+        .dmft-input-wrapper { position: relative; }
+        .dmft-input { width: 100%; text-align: center; font-size: 1.5rem; font-weight: bold; border: 2px solid transparent; border-radius: 0.375rem; }
+        .dmft-input:focus { border-color: #4f46e5; }
+        .dmft-input.manual-override { background-color: #eef2ff; }
+        .dmft-lock-icon { position: absolute; top: 2px; right: 2px; color: #6b7280; font-size: 0.6rem; display: none; }
+        .dmft-input.manual-override + .dmft-lock-icon { display: inline; }
+
+        /* Scheduler styles */
+        .view-btn.active { background-color: #4f46e5; color: white; }
+        #day-view-grid { display: grid; grid-template-columns: 60px 1fr; }
+        .time-slot { height: 15px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #6b7280; text-align: right; padding-right: 5px; }
+        .time-slot:nth-child(4n+1) { height: 14px; border-top: 1px solid #d1d5db; }
+        .day-column { position: relative; border-left: 1px solid #d1d5db; }
+        .calendar-slot { height: 15px; border-top: 1px solid #e5e7eb; cursor: pointer; }
+        .calendar-slot:hover { background-color: #eff6ff; }
+        .appointment-block { position: absolute; left: 2px; right: 2px; border-left-width: 3px; border-radius: 4px; padding: 4px; color: white; font-size: 12px; cursor: pointer; overflow: hidden; z-index: 10; }
+        .appointment-block.status-Scheduled { background-color: #dbeafe; border-color: #60a5fa; color: #1e3a8a; }
+        .appointment-block.status-Confirmed { background-color: #dcfce7; border-color: #4ade80; color: #15803d; }
+        .appointment-block.status-Arrived { background-color: #e9d5ff; border-color: #a855f7; color: #581c87; }
+        .appointment-block.status-Completed { background-color: #e5e7eb; border-color: #9ca3af; color: #374151; }
+        .appointment-block.status-No-Show { background-color: #fee2e2; border-color: #f87171; color: #991b1b; }
+        .appointment-note-icon { position: absolute; bottom: 4px; right: 4px; color: inherit; opacity: 0.7; font-size: 10px; }
+        #month-view-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+        .month-day-cell { min-height: 100px; border: 1px solid #e5e7eb; padding: 4px; cursor: pointer; }
+        .month-day-cell:hover { background-color: #f9fafb; }
+        .month-day-cell.other-month { background-color: #f9fafb; color: #9ca3af; }
+        .month-day-cell.today { background-color: #eff6ff; }
+        .month-appointment-dot { display: block; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; padding: 0 4px; border-radius: 4px; }
+        #week-view-grid { display: grid; grid-template-columns: 60px repeat(7, 1fr); }
+        .week-day-column { position: relative; border-left: 1px solid #d1d5db; }
+
+        .no-print { @media print { display: none; } }
+        @media print {
+            body > *:not(.print-this-modal) { display: none !important; }
+            .print-this-modal, .print-this-modal .modal-overlay { display: block !important; position: absolute; top: 0; left: 0; width: 100%; background-color: white !important; }
+            .modal-content { box-shadow: none !important; border: 1px solid #ccc; max-height: none; }
+            #handout-modal-content { max-height: none; }
+            .no-print { display: none !important; }
+        }
+        
+        .note-indicator { stroke: #ffffff; stroke-width: 1px; cursor: pointer; pointer-events: all !important; }
+        .note-indicator:hover { opacity: 0.8; }
+        #note-tooltip { pointer-events: none; white-space: pre-wrap; max-width: 250px; }
+        #handout-modal-content { white-space: pre-wrap; }
+        #handout-modal-content ul { list-style-type: disc; margin-left: 1.5rem; }
+        #handout-modal-content h3 { font-weight: bold; margin-top: 1rem; }
+
+
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.17.0",
+    "marked": "https://aistudiocdn.com/marked@^16.2.1"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="p-4 bg-gray-100">
+    <!-- Main Application Container -->
+    <div id="app-container" class="container mx-auto max-w-full p-6 bg-white rounded-2xl shadow-xl">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-6 no-print">
+            <div class="text-center flex-grow">
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-800">S&P Smiles Co.</h1>
+                <p id="app-subtitle" class="text-gray-500 mt-2">Practice Management</p>
+            </div>
+            <div class="flex items-center gap-4">
+                 <label for="outreach-toggle" class="flex items-center cursor-pointer">
+                    <span class="mr-3 text-sm font-medium text-gray-900">Outreach Mode</span>
+                    <div class="relative">
+                        <input type="checkbox" id="outreach-toggle" class="sr-only outreach-toggle">
+                        <div class="block bg-gray-600 w-14 h-8 rounded-full"></div>
+                        <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Comprehensive View Container -->
+        <div id="comprehensive-view">
+             <!-- Patient Information Section with Tabs -->
+            <div class="mb-6 p-4 bg-gray-50 rounded-lg border">
+                <div class="border-b border-gray-200 no-print">
+                    <nav class="-mb-px flex space-x-8 flex-wrap" aria-label="Tabs">
+                        <button id="tab-patient-hub" class="tab-btn active whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">Patient Hub</button>
+                        <button id="tab-practice-dashboard" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Practice Dashboard</button>
+                        <button id="tab-scheduler" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Scheduler</button>
+                        <button id="tab-personal" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Personal Details</button>
+                        <button id="tab-history" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Medical & Dental History</button>
+                        <button id="tab-exam" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Clinical Exam</button>
+                        <button id="tab-investigations" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Investigations</button>
+                        <button id="tab-admin" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Admin & Billing</button>
+                        <button id="tab-inventory" class="tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Inventory</button>
+                    </nav>
+                </div>
+
+                <!-- Panel 0: Patient Hub -->
+                <div id="panel-patient-hub" class="tab-panel mt-6">
+                    <div class="p-4 border rounded-lg bg-white lg:col-span-4 mb-6">
+                        <div class="flex items-center space-x-8">
+                            <div><p class="text-sm text-gray-500">Name</p><p id="hub-name" class="font-bold text-xl text-gray-900">-</p></div>
+                            <div><p class="text-sm text-gray-500">Patient ID</p><p id="hub-id" class="font-bold text-xl text-gray-900">-</p></div>
+                            <div><p class="text-sm text-gray-500">Age</p><p id="hub-age" class="font-bold text-xl text-gray-900">-</p></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Patient Hub Cards -->
+                        <div class="p-4 border border-red-300 rounded-lg bg-red-50">
+                            <h3 class="text-lg font-semibold text-red-800 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Medical Alerts</h3>
+                            <ul id="hub-alerts" class="list-disc list-inside text-red-700 font-medium"><li>No alerts</li></ul>
+                        </div>
+                        <div class="p-4 border rounded-lg bg-blue-50">
+                            <h3 class="text-lg font-semibold text-blue-800 mb-2"><i class="fas fa-dollar-sign mr-2"></i>Outstanding Balance</h3>
+                            <p id="hub-balance" class="font-bold text-3xl text-blue-900">R 0.00</p>
+                        </div>
+                        <div class="p-4 border rounded-lg bg-green-50">
+                            <h3 class="text-lg font-semibold text-green-800 mb-2"><i class="fas fa-calendar-alt mr-2"></i>Next Appointment</h3>
+                            <div id="hub-appointment"><p class="text-gray-700">No upcoming appointments.</p></div>
+                        </div>
+                        <div class="p-4 border rounded-lg bg-yellow-50">
+                            <h3 class="text-lg font-semibold text-yellow-800 mb-2"><i class="fas fa-tasks mr-2"></i>Outstanding Treatment</h3>
+                            <ul id="hub-outstanding-treatment" class="list-disc list-inside text-yellow-700 text-sm"><li>None</li></ul>
+                        </div>
+                        <div class="p-4 border rounded-lg bg-indigo-50">
+                             <h3 class="text-lg font-semibold text-indigo-800 mb-2"><i class="fas fa-history mr-2"></i>Recent Activity</h3>
+                            <ul id="hub-recent-activity" class="list-disc list-inside text-indigo-700 text-sm"><li>No procedures logged.</li></ul>
+                        </div>
+                        <!-- AI Patient Outreach -->
+                        <div class="p-4 border rounded-lg bg-teal-50">
+                            <h3 class="text-lg font-semibold text-teal-800 mb-2"><i class="fas fa-bullhorn mr-2"></i>AI Patient Outreach</h3>
+                            <div class="flex items-end gap-2">
+                                <div class="flex-grow">
+                                    <label for="outreach-type-select" class="block text-sm font-medium text-gray-700">Message Type</label>
+                                    <select id="outreach-type-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                                        <option value="follow-up">Post-Procedure Follow-up</option>
+                                        <option value="recall">Recall Reminder</option>
+                                    </select>
+                                </div>
+                                <button id="generate-outreach-btn" class="px-4 py-2 bg-teal-500 text-white rounded-md hover:bg-teal-600 text-sm font-semibold">Generate</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel: Practice Dashboard -->
+                <div id="panel-practice-dashboard" class="tab-panel hidden mt-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <!-- KPIs -->
+                        <div class="p-4 border rounded-lg bg-gray-100 text-center"><p class="text-sm text-gray-500">Total Patients</p><p id="kpi-total-patients" class="font-bold text-3xl text-gray-900">0</p></div>
+                        <div class="p-4 border rounded-lg bg-gray-100 text-center"><p class="text-sm text-gray-500">Total Practice Revenue</p><p id="kpi-total-revenue" class="font-bold text-3xl text-gray-900">R0</p></div>
+                        <div class="p-4 border rounded-lg bg-gray-100 text-center"><p class="text-sm text-gray-500">Avg. Revenue / Patient</p><p id="kpi-avg-revenue" class="font-bold text-3xl text-gray-900">R0</p></div>
+                        <div class="p-4 border rounded-lg bg-gray-100 text-center"><p class="text-sm text-gray-500">No-Show Rate</p><p id="kpi-no-show-rate" class="font-bold text-3xl text-gray-900">0%</p></div>
+
+                        <!-- Monthly Revenue Chart -->
+                        <div class="p-4 border rounded-lg bg-white md:col-span-2 lg:col-span-4">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-3">Practice Monthly Revenue (Last 6 Months)</h3>
+                            <div class="h-64"><canvas id="revenue-chart-canvas"></canvas></div>
+                        </div>
+
+                        <!-- Procedure Breakdown Chart -->
+                        <div class="p-4 border rounded-lg bg-white lg:col-span-2">
+                             <h3 class="text-lg font-semibold text-gray-800 mb-3">Practice Procedure Breakdown</h3>
+                            <div id="procedure-chart-container" class="h-64 flex items-center justify-center">
+                                <canvas id="procedure-chart-canvas"></canvas>
+                                <div id="procedure-chart-placeholder" class="hidden text-center text-gray-500">
+                                    <i class="fas fa-chart-pie fa-2x mb-2"></i>
+                                    <p>No procedure data available.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- AI Business Insights -->
+                        <div class="p-4 border rounded-lg bg-purple-50 lg:col-span-2">
+                            <h3 class="text-lg font-semibold text-purple-800 mb-2"><i class="fas fa-lightbulb mr-2"></i>AI Business Insights</h3>
+                            <div id="ai-insights-results" class="text-sm text-purple-900 mb-3 h-52 overflow-y-auto"><p>Click the button to generate insights about your entire practice.</p></div>
+                            <button id="generate-ai-insights-btn" class="w-full bg-purple-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-600 transition text-sm action-btn"><i class="fas fa-magic"></i> Generate Insights</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel Scheduler -->
+                <div id="panel-scheduler" class="tab-panel hidden mt-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="flex items-center gap-4">
+                             <button id="prev-period-btn" class="p-2 rounded-full hover:bg-gray-200"><i class="fas fa-chevron-left"></i></button>
+                             <h3 id="scheduler-date" class="text-xl font-semibold text-center w-64"></h3>
+                             <button id="next-period-btn" class="p-2 rounded-full hover:bg-gray-200"><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                        <div>
+                             <button id="day-view-btn" class="view-btn px-3 py-1 text-sm rounded-md border">Day</button>
+                             <button id="week-view-btn" class="view-btn px-3 py-1 text-sm rounded-md border">Week</button>
+                             <button id="month-view-btn" class="view-btn px-3 py-1 text-sm rounded-md border">Month</button>
+                        </div>
+                    </div>
+                    <div id="calendar-container" class="border rounded-lg overflow-hidden">
+                        <!-- Calendar grid will be dynamically generated here -->
+                    </div>
+                </div>
+
+                <!-- Panel 1: Personal Details -->
+                <div id="panel-personal" class="tab-panel mt-6 hidden">
+                    <div class="space-y-6">
+                        <div class="p-4 border rounded-lg bg-white">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-3">Patient Identification</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <div><label for="patient-name" class="block text-sm font-medium text-gray-700">Full Name</label><input type="text" id="patient-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                                <div><label for="patient-dob" class="block text-sm font-medium text-gray-700">Date of Birth</label><input type="date" id="patient-dob" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                                <div><label for="patient-gender" class="block text-sm font-medium text-gray-700">Gender</label><input type="text" id="patient-gender" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                                <div class="flex items-end gap-2 no-print">
+                                    <div class="flex-grow"><label for="patient-id" class="block text-sm font-medium text-gray-700">Patient ID / File No.</label><input type="text" id="patient-id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                                    <button id="load-patient-btn" class="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm" title="Load Patient by ID"><i class="fas fa-search"></i></button>
+                                    <button id="outreach-dashboard-btn" class="px-3 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 text-sm" title="Open Patient Files"><i class="fas fa-folder-open"></i></button>
+                                </div>
+                                <div><label for="patient-id-passport" class="block text-sm font-medium text-gray-700">ID / Passport No.</label><input type="text" id="patient-id-passport" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                            </div>
+                        </div>
+                        <div class="p-4 border rounded-lg bg-white">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-3">Contact Information</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <div><label for="patient-phone" class="block text-sm font-medium text-gray-700">Phone Number</label><input type="tel" id="patient-phone" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                                <div><label for="patient-email" class="block text-sm font-medium text-gray-700">Email Address</label><input type="email" id="patient-email" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                                <div class="md:col-span-2 lg:col-span-3"><label for="patient-address" class="block text-sm font-medium text-gray-700">Address</label><input type="text" id="patient-address" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                                <div><label for="patient-emergency-contact-name" class="block text-sm font-medium text-gray-700">Emergency Contact Name</label><input type="text" id="patient-emergency-contact-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                                <div><label for="patient-emergency-contact-number" class="block text-sm font-medium text-gray-700">Emergency Contact Number</label><input type="tel" id="patient-emergency-contact-number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                                 <div><label for="patient-contact-method" class="block text-sm font-medium text-gray-700">Preferred Contact Method</label><select id="patient-contact-method" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"><option>Phone</option><option>Email</option><option>WhatsApp</option></select></div>
+                            </div>
+                        </div>
+                         <div class="p-4 border rounded-lg bg-white">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-3">Medical Aid & Templates</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <div><label for="med-aid-name" class="block text-sm font-medium text-gray-700">Medical Aid Name</label><input type="text" id="med-aid-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                                <div><label for="med-aid-number" class="block text-sm font-medium text-gray-700">Medical Aid Number</label><input type="text" id="med-aid-number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                                <div><label for="med-aid-member" class="block text-sm font-medium text-gray-700">Main Member Name</label><input type="text" id="med-aid-member" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                                <div><label for="med-aid-member-id" class="block text-sm font-medium text-gray-700">Main Member ID Number</label><input type="text" id="med-aid-member-id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                                <div><label for="referral-source" class="block text-sm font-medium text-gray-700">Referral Source</label><input type="text" id="referral-source" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                                <div class="flex items-end gap-2 no-print">
+                                    <div class="flex-grow"><label for="template-select" class="block text-sm font-medium text-gray-700">Apply Template</label><select id="template-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"><option value="clear">Clear Form</option><option value="healthy">Healthy Adult Prophy</option></select></div>
+                                    <button id="apply-template-btn" class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm">Apply</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 2: Medical & Dental History -->
+                <div id="panel-history" class="tab-panel mt-6 hidden">
+                     <div class="space-y-6">
+                        <div class="p-4 border rounded-lg bg-white">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-3">Medical History</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Systemic Diseases</label>
+                                    <div class="mt-2 space-y-2">
+                                        <div class="flex items-center"><input id="cond-diabetes" type="checkbox" class="h-4 w-4 text-indigo-600 border-gray-300 rounded"><label for="cond-diabetes" class="ml-2 block text-sm text-gray-900">Diabetes</label></div>
+                                        <div class="flex items-center"><input id="cond-hypertension" type="checkbox" class="h-4 w-4 text-indigo-600 border-gray-300 rounded"><label for="cond-hypertension" class="ml-2 block text-sm text-gray-900">Hypertension</label></div>
+                                        <div class="flex items-center"><input id="cond-asthma" type="checkbox" class="h-4 w-4 text-indigo-600 border-gray-300 rounded"><label for="cond-asthma" class="ml-2 block text-sm text-gray-900">Asthma</label></div>
+                                        <div class="flex items-center"><input id="cond-epilepsy" type="checkbox" class="h-4 w-4 text-indigo-600 border-gray-300 rounded"><label for="cond-epilepsy" class="ml-2 block text-sm text-gray-900">Epilepsy</label></div>
+                                        <div class="flex items-center"><input id="cond-heart" type="checkbox" class="h-4 w-4 text-indigo-600 border-gray-300 rounded"><label for="cond-heart" class="ml-2 block text-sm text-gray-900">Heart Conditions</label></div>
+                                    </div>
+                                </div>
+                                <div><label for="history-systemic-other" class="block text-sm font-medium text-gray-700">Other Conditions</label><textarea id="history-systemic-other" rows="5" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea><div class="mt-1"><button class="quick-btn" data-target="history-systemic-other">None</button><button class="quick-btn" data-target="history-systemic-other">WNL</button></div></div>
+                                <div>
+                                    <label for="history-medications" class="block text-sm font-medium text-gray-700">Medications & Allergies</label>
+                                    <textarea id="history-medications" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                                    <div class="mt-1"><button class="quick-btn" data-target="history-medications">NKDA</button></div>
+                                </div>
+                                <div class="md:col-span-2"><label for="history-surgeries" class="block text-sm font-medium text-gray-700">Previous Surgeries / Hospitalizations</label><textarea id="history-surgeries" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea><div class="mt-1"><button class="quick-btn" data-target="history-surgeries">None reported</button></div></div>
+                            </div>
+                        </div>
+                         <div class="p-4 border rounded-lg bg-white">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-3">Dental History</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                                <div class="md:col-span-2"><label for="history-dental-treatments" class="block text-sm font-medium text-gray-700">Past Dental Treatments (e.g., fillings, extractions, braces)</label><textarea id="history-dental-treatments" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea><div class="mt-1"><button class="quick-btn" data-target="history-dental-treatments">None reported</button></div></div>
+                                <div>
+                                    <label for="history-oral-hygiene" class="block text-sm font-medium text-gray-700">Oral Hygiene Routines</label>
+                                    <textarea id="history-oral-hygiene" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                                    <div class="mt-1"><button class="quick-btn" data-target="history-oral-hygiene">Brushes 2x/day</button><button class="quick-btn" data-target="history-oral-hygiene">Flosses Daily</button><button class="quick-btn" data-target="history-oral-hygiene">Uses Mouthwash</button><button class="quick-btn" data-target="history-oral-hygiene">Good</button><button class="quick-btn" data-target="history-oral-hygiene">Fair</button><button class="quick-btn" data-target="history-oral-hygiene">Poor</button></div>
+                                </div>
+                                <div class="md:col-span-2"><label for="history-pain" class="block text-sm font-medium text-gray-700">Pain or Sensitivity History</label><textarea id="history-pain" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea><div class="mt-1"><button class="quick-btn" data-target="history-pain">None reported</button></div></div>
+                                 <div>
+                                    <label for="history-anxiety" class="block text-sm font-medium text-gray-700">Dental Anxiety / Phobias</label>
+                                    <textarea id="history-anxiety" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                                    <div class="mt-1"><button class="quick-btn" data-target="history-anxiety">None</button><button class="quick-btn" data-target="history-anxiety">Mild</button><button class="quick-btn" data-target="history-anxiety">Moderate</button><button class="quick-btn" data-target="history-anxiety">Severe</button></div>
+                                </div>
+                                 <div><label for="prev-dentist-name" class="block text-sm font-medium text-gray-700">Previous Dentist's Name</label><input type="text" id="prev-dentist-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                                <div><label for="prev-dentist-contact" class="block text-sm font-medium text-gray-700">Previous Dentist's Contact</label><input type="text" id="prev-dentist-contact" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 3: Clinical Exam -->
+                <div id="panel-exam" class="tab-panel mt-6 hidden">
+                    <div class="space-y-6">
+                        <div class="p-4 border rounded-lg bg-white">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-3">Extra/Intra-Oral Examination</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div><label for="exam-face" class="block text-sm font-medium text-gray-700">Face/Symmetry</label><textarea id="exam-face" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea><div class="mt-1"><button class="quick-btn" data-target="exam-face">WNL</button><button class="quick-btn" data-target="exam-face">Symmetrical</button><button class="quick-btn" data-target="exam-face">No swelling</button></div></div>
+                                <div><label for="exam-tmj" class="block text-sm font-medium text-gray-700">TMJ</label><textarea id="exam-tmj" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea><div class="mt-1"><button class="quick-btn" data-target="exam-tmj">WNL</button><button class="quick-btn" data-target="exam-tmj">No clicks or deviation</button><button class="quick-btn" data-target="exam-tmj">Pain on palpation</button></div></div>
+                                <div><label for="exam-lymph" class="block text-sm font-medium text-gray-700">Lymph Nodes</label><textarea id="exam-lymph" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea><div class="mt-1"><button class="quick-btn" data-target="exam-lymph">WNL</button><button class="quick-btn" data-target="exam-lymph">Non-palpable</button><button class="quick-btn" data-target="exam-lymph">Palpable, non-tender</button></div></div>
+                                <div><label for="exam-lesions" class="block text-sm font-medium text-gray-700">Soft Tissue Lesions</label><textarea id="exam-lesions" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea><div class="mt-1"><button class="quick-btn" data-target="exam-lesions">No lesions noted</button></div></div>
+                                <div><label for="exam-saliva" class="block text-sm font-medium text-gray-700">Saliva</label><textarea id="exam-saliva" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea><div class="mt-1"><button class="quick-btn" data-target="exam-saliva">WNL</button><button class="quick-btn" data-target="exam-saliva">Normal flow</button><button class="quick-btn" data-target="exam-saliva">Xerostomia</button></div></div>
+                                <div><label for="exam-tongue" class="block text-sm font-medium text-gray-700">Tongue</label><textarea id="exam-tongue" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea><div class="mt-1"><button class="quick-btn" data-target="exam-tongue">WNL</button><button class="quick-btn" data-target="exam-tongue">Coated</button><button class="quick-btn" data-target="exam-tongue">Scalloped</button></div></div>
+                                <div><label for="exam-gingiva" class="block text-sm font-medium text-gray-700">Gingiva</label><textarea id="exam-gingiva" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea><div class="mt-1"><button class="quick-btn" data-target="exam-gingiva">WNL</button><button class="quick-btn" data-target="exam-gingiva">No BOP</button><button class="quick-btn" data-target="exam-gingiva">Generalized inflammation</button><button class="quick-btn" data-target="exam-gingiva">Localized inflammation</button></div></div>
+                                <div><label for="exam-mucosa" class="block text-sm font-medium text-gray-700">Mucosa</label><textarea id="exam-mucosa" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea><div class="mt-1"><button class="quick-btn" data-target="exam-mucosa">WNL</button></div></div>
+                                <div><label for="exam-cancer-screening" class="block text-sm font-medium text-gray-700">Oral Cancer Screening</label><textarea id="exam-cancer-screening" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea><div class="mt-1"><button class="quick-btn" data-target="exam-cancer-screening">No lesions noted</button><button class="quick-btn" data-target="exam-cancer-screening">Negative</button></div></div>
+                                <div><label for="exam-habits" class="block text-sm font-medium text-gray-700">Habits (e.g., bruxism)</label><textarea id="exam-habits" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea><div class="mt-1"><button class="quick-btn" data-target="exam-habits">None noted</button><button class="quick-btn" data-target="exam-habits">Reports bruxism</button><button class="quick-btn" data-target="exam-habits">Evidence of clenching</button></div></div>
+                            </div>
+                        </div>
+                        <div class="p-4 border rounded-lg bg-white">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-3">General Clinical Notes</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div><label for="exam-malocclusion" class="block text-sm font-medium text-gray-700">Malocclusion / Orthodontic Notes</label><textarea id="exam-malocclusion" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea></div>
+                                <div><label for="exam-occlusion" class="block text-sm font-medium text-gray-700">Occlusion / Bite Type</label><textarea id="exam-occlusion" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea><div class="mt-1"><button class="quick-btn" data-target="exam-occlusion">Class I</button><button class="quick-btn" data-target="exam-occlusion">Class II Div 1</button><button class="quick-btn" data-target="exam-occlusion">Class II Div 2</button><button class="quick-btn" data-target="exam-occlusion">Class III</button></div></div>
+                                <div class="md:col-span-2"><label for="exam-supernumerary" class="block text-sm font-medium text-gray-700">Notes (e.g., Supernumerary Teeth)</label><textarea id="exam-supernumerary" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Panel 4: Investigations -->
+                <div id="panel-investigations" class="tab-panel mt-6 hidden">
+                    <div class="space-y-6">
+                        <div class="p-4 border rounded-lg bg-white">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-3">X-Rays & Radiographs</h3>
+                            <div class="space-y-4">
+                                <div><label class="block text-sm font-medium text-gray-700">Bitewings</label><div class="mt-1 grid grid-cols-1 md:grid-cols-4 gap-4"><input type="date" id="invest-bitewings-date" class="md:col-span-1 rounded-md border-gray-300 shadow-sm"><textarea id="invest-bitewings-details" rows="1" placeholder="Record Details" class="md:col-span-3 rounded-md border-gray-300 shadow-sm"></textarea><textarea id="invest-bitewings-findings" rows="2" placeholder="Findings / Summary" class="md:col-span-4 rounded-md border-gray-300 shadow-sm"></textarea><input type="text" id="invest-bitewings-ref" placeholder="File Location / Reference No." class="md:col-span-4 rounded-md border-gray-300 shadow-sm"></div></div>
+                                <div><label class="block text-sm font-medium text-gray-700">Panoramic (OPG)</label><div class="mt-1 grid grid-cols-1 md:grid-cols-4 gap-4"><input type="date" id="invest-panoramic-date" class="md:col-span-1 rounded-md border-gray-300 shadow-sm"><textarea id="invest-panoramic-details" rows="1" placeholder="Record Details" class="md:col-span-3 rounded-md border-gray-300 shadow-sm"></textarea><textarea id="invest-panoramic-findings" rows="2" placeholder="Findings / Summary" class="md:col-span-4 rounded-md border-gray-300 shadow-sm"></textarea><input type="text" id="invest-panoramic-ref" placeholder="File Location / Reference No." class="md:col-span-4 rounded-md border-gray-300 shadow-sm"></div></div>
+                                <div><label class="block text-sm font-medium text-gray-700">Periapical</label><div class="mt-1 grid grid-cols-1 md:grid-cols-4 gap-4"><input type="date" id="invest-periapical-date" class="md:col-span-1 rounded-md border-gray-300 shadow-sm"><textarea id="invest-periapical-details" rows="1" placeholder="Record Details" class="md:col-span-3 rounded-md border-gray-300 shadow-sm"></textarea><textarea id="invest-periapical-findings" rows="2" placeholder="Findings / Summary" class="md:col-span-4 rounded-md border-gray-300 shadow-sm"></textarea><input type="text" id="invest-periapical-ref" placeholder="File Location / Reference No." class="md:col-span-4 rounded-md border-gray-300 shadow-sm"></div></div>
+                            </div>
+                        </div>
+
+                        <div class="p-4 border rounded-lg bg-white">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-3">AI Radiograph Analysis</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                                <div>
+                                    <div id="xray-preview-container" class="w-full h-64 bg-gray-200 rounded-lg flex items-center justify-center border-2 border-dashed">
+                                        <img id="xray-preview-img" src="" alt="X-Ray Preview" class="max-w-full max-h-full hidden">
+                                        <span id="xray-placeholder" class="text-gray-500">Select an image to preview</span>
+                                    </div>
+                                    <input type="file" id="xray-file-input" class="hidden" accept="image/*">
+                                    <div class="flex gap-2 mt-3">
+                                        <button id="select-xray-btn" class="w-full bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700 transition text-sm"><i class="fas fa-upload"></i> Select Image</button>
+                                        <button id="analyze-xray-btn" class="w-full bg-purple-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-600 transition text-sm action-btn" disabled><i class="fas fa-magic"></i> Analyze with AI</button>
+                                    </div>
+                                </div>
+                                <div class="h-full">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">AI Findings</label>
+                                    <div id="ai-radiograph-results" class="w-full h-72 p-3 bg-gray-50 border rounded-md overflow-y-auto text-sm">
+                                        <p class="text-gray-500">Upload a dental radiograph and click "Analyze" to see AI-powered insights here.</p>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-2 italic">Disclaimer: AI analysis is for informational purposes only and must be verified by a qualified dental professional.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                 <!-- Panel 5: Admin & Billing -->
+                <div id="panel-admin" class="tab-panel mt-6 hidden">
+                     <div class="space-y-6">
+                        <div class="p-4 border rounded-lg bg-white">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-3">Billing Ledger</h3>
+                            <div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200 text-sm"><thead class="bg-gray-50"><tr><th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th><th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th><th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th><th class="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Charge</th><th class="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Credit</th><th class="px-2 py-2 text-right font-medium text-sm">Balance</th><th class="px-2 py-2"></th></tr></thead><tbody id="billing-log-body" class="bg-white divide-y divide-gray-200"><tr><td colspan="7" class="text-center text-gray-500 p-4">No billing items have been added.</td></tr></tbody><tfoot class="bg-gray-100"><tr><td colspan="6" class="px-2 py-2 text-right font-bold text-gray-700">Total Balance:</td><td id="total-balance" class="px-2 py-2 font-bold text-gray-900 text-right">R 0.00</td><td></td></tr></tfoot></table></div>
+                            <div class="mt-4 flex gap-4"><button id="add-billing-item-btn" class="bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600 transition text-sm"><i class="fas fa-plus"></i> Add Charge</button><button id="record-payment-btn" class="bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition text-sm"><i class="fas fa-money-bill-wave"></i> Record Payment</button><button id="generate-statement-btn" class="bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-600 transition text-sm"><i class="fas fa-file-invoice"></i> Generate Statement</button></div>
+                        </div>
+                        <div class="p-4 border rounded-lg bg-white">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-3">Consent Form Log</h3>
+                            <div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th><th class="px-4 py-2"></th></tr></thead><tbody id="consent-log-body" class="bg-white divide-y divide-gray-200"><tr><td colspan="4" class="text-center text-gray-500 p-4">No consent forms have been logged.</td></tr></tbody></table></div>
+                            <button id="add-consent-btn" class="mt-4 bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600 transition text-sm"><i class="fas fa-plus"></i> Add Consent</button>
+                        </div>
+                         <div class="p-4 border rounded-lg bg-white">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-3">Communications</h3>
+                            <button id="generate-referral-btn" class="bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-600 transition text-sm"><i class="fas fa-user-md"></i> Generate Referral Letter</button>
+                        </div>
+                    </div>
+                </div>
+                
+                 <!-- Panel 6: Inventory -->
+                <div id="panel-inventory" class="tab-panel mt-6 hidden">
+                     <div class="p-4 border rounded-lg bg-white">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-semibold text-gray-800">Inventory Management</h3>
+                            <div class="flex items-center gap-4">
+                                <input type="text" id="inventory-search-input" placeholder="Search items..." class="w-full md:w-64 p-2 border rounded-md shadow-sm">
+                                <button id="add-inventory-item-btn" class="bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600 transition text-sm whitespace-nowrap"><i class="fas fa-plus mr-2"></i>Add Item</button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item Name</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Low Stock Threshold</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
+                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inventory-table-body" class="bg-white divide-y divide-gray-200 text-sm">
+                                    <!-- Inventory items will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex flex-col lg:flex-row gap-8">
+            <!-- Dental Chart Column -->
+            <div class="w-full lg:w-3/4">
+                <div id="chart-container" class="bg-gray-50 p-4 rounded-lg border">
+                    <svg id="chart" class="w-full h-auto"></svg>
+                </div>
+            </div>
+
+            <!-- Controls Column -->
+            <div class="w-full lg:w-1/4">
+                 <div id="outreach-view-controls" class="bg-gray-50 p-4 rounded-lg border h-full flex-col hidden">
+                     <h3 class="text-lg font-semibold text-gray-700 mb-2 text-center">Outreach Mode</h3>
+                     <div class="space-y-4 overflow-y-auto">
+                        <details class="p-2 border rounded-lg bg-white" open><summary class="font-semibold cursor-pointer">Quick Patient Info</summary><div class="mt-2 space-y-2"><div><label for="outreach-patient-name" class="block text-xs font-medium text-gray-700">Name</label><input type="text" id="outreach-patient-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm p-1"></div><div><label for="outreach-patient-id" class="block text-xs font-medium text-gray-700">ID / Identifier</label><input type="text" id="outreach-patient-id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm p-1"></div><div><label for="outreach-patient-dob" class="block text-xs font-medium text-gray-700">Date of Birth</label><input type="date" id="outreach-patient-dob" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm p-1"></div></div></details>
+                        <details class="p-2 border rounded-lg bg-white" open><summary class="font-semibold cursor-pointer">DMFT Index</summary><div class="grid grid-cols-4 gap-2 text-center mt-2"><div><div class="dmft-input-wrapper"><input type="number" id="dmft-d" class="dmft-input text-red-600" value="0"><i class="fas fa-lock dmft-lock-icon"></i></div><p class="text-xs font-medium text-gray-500">Decayed</p></div><div><div class="dmft-input-wrapper"><input type="number" id="dmft-m" class="dmft-input text-gray-600" value="0"><i class="fas fa-lock dmft-lock-icon"></i></div><p class="text-xs font-medium text-gray-500">Missing</p></div><div><div class="dmft-input-wrapper"><input type="number" id="dmft-f" class="dmft-input text-blue-600" value="0"><i class="fas fa-lock dmft-lock-icon"></i></div><p class="text-xs font-medium text-gray-500">Filled</p></div><div><div class="dmft-input-wrapper"><p id="dmft-total-outreach" class="dmft-input text-purple-600">0</p></div><p class="text-xs font-medium text-gray-500">Total</p></div></div></details>
+                        <details class="p-2 border rounded-lg bg-white"><summary class="font-semibold cursor-pointer">Critical Medical History</summary><div class="mt-2 space-y-2"><div><label for="outreach-med-hx" class="block text-xs font-medium text-gray-700">Allergies / Key Notes</label><textarea id="outreach-med-hx" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm p-1"></textarea></div><div class="flex items-center"><input id="outreach-cond-diabetes" type="checkbox" class="h-4 w-4"><label for="outreach-cond-diabetes" class="ml-2 text-sm">Diabetes</label></div><div class="flex items-center"><input id="outreach-cond-heart" type="checkbox" class="h-4 w-4"><label for="outreach-cond-heart" class="ml-2 text-sm">Heart Condition</label></div></div></details>
+                        <details class="p-2 border rounded-lg bg-white"><summary class="font-semibold cursor-pointer">Medical Aid</summary><div class="mt-2 space-y-2"><div><label for="outreach-med-aid-name" class="block text-xs font-medium text-gray-700">Medical Aid Name</label><input type="text" id="outreach-med-aid-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm p-1"></div><div><label for="outreach-med-aid-number" class="block text-xs font-medium text-gray-700">Medical Aid Number</label><input type="text" id="outreach-med-aid-number" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm p-1"></div></div></details>
+                     </div>
+                      <div class="mt-auto space-y-2 pt-4">
+                         <button id="save-outreach-chart" class="w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600">Save Patient</button>
+                         <button id="reset-outreach-chart" class="w-full bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">New Patient</button>
+                    </div>
+                </div>
+                <div id="comprehensive-view-controls" class="bg-gray-50 p-4 rounded-lg border h-full flex flex-col">
+                    <div class="mb-4 no-print">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-2">AI Clinical Scribe & Assistant</h3>
+                        <div class="bg-white p-2 rounded-lg border">
+                            <div id="ai-log" class="h-28 border rounded-lg p-2 text-sm overflow-y-auto bg-gray-50 mb-2"><p class="ai-log">Ready to assist. Press "Start Scribing".</p></div>
+                            <button id="ai-mic-btn" class="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition shadow">
+                                <span id="ai-mic-btn-text"><i class="fas fa-microphone"></i> Start Scribing</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-4 no-print"><h3 class="text-lg font-semibold text-gray-700 mb-2">Selected Condition</h3><div id="selected-condition-display" class="p-3 rounded-lg text-center font-bold border-2"></div><button id="change-condition-btn" class="w-full mt-2 bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition">Change</button></div>
+                    <div class="mb-4 no-print"><h3 class="text-lg font-semibold text-gray-700 mb-2">Timeline</h3><div class="flex gap-2"><select id="snapshot-select" class="block w-full rounded-md border-gray-300 shadow-sm"><option value="-1">Current Chart</option></select><button id="save-snapshot-btn" class="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600" title="Save Snapshot"><i class="fas fa-camera"></i></button></div></div>
+                    <details class="p-2 border rounded-lg bg-white mb-4 no-print" open><summary class="font-semibold cursor-pointer">Clinical Scores</summary><div class="grid grid-cols-4 gap-2 text-center mt-2"><div><p id="score-d" class="text-2xl font-bold text-red-600">0</p><p class="text-xs font-medium text-gray-500">Decayed</p></div><div><p id="score-m" class="text-2xl font-bold text-gray-600">0</p><p class="text-xs font-medium text-gray-500">Missing</p></div><div><p id="score-f" class="text-2xl font-bold text-blue-600">0</p><p class="text-xs font-medium text-gray-500">Filled</p></div><div><p id="score-dmft" class="text-2xl font-bold text-purple-600">0</p><p class="text-xs font-medium text-gray-500">DMFT</p></div></div></details>
+                    <div class="mt-auto space-y-2 no-print">
+                        <div class="flex justify-center gap-2"><button id="undo-btn" class="action-btn w-1/2 bg-gray-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-600"><i class="fas fa-undo"></i> Undo</button><button id="redo-btn" class="action-btn w-1/2 bg-gray-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-600">Redo <i class="fas fa-redo"></i></button></div>
+                        <button id="toggle-dentition-btn" class="w-full bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-600">Toggle Dentition</button>
+                        <button id="save-chart" class="w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600">Save All Data</button>
+                        <button id="print-chart-btn" class="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600">Print Patient Chart</button>
+                        <button id="reset-chart" class="w-full bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">Reset Chart</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Periodontal Charting Section -->
+        <div id="perio-chart-section" class="mt-8 p-4 bg-gray-50 rounded-lg border overflow-x-auto">
+            <div class="flex justify-between items-center mb-4">
+                 <h2 class="text-xl font-bold text-gray-800">Periodontal Charting</h2>
+                 <div class="flex items-center gap-4"><div class="flex gap-4 text-sm font-semibold"><div>BOP: <span id="bop-score" class="text-red-600">0%</span></div><div>Plaque: <span id="pi-score" class="text-blue-600">0%</span></div></div><button id="compare-snapshots-btn" class="text-sm bg-gray-200 px-2 py-1 rounded hover:bg-gray-300 no-print">Compare Snapshots</button></div>
+            </div>
+            <div id="perio-chart-container" class="min-w-max"></div>
+        </div>
+
+        <!-- Treatment Records Section -->
+        <div id="treatment-records-section" class="mt-8 p-4 bg-gray-50 rounded-lg border">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Treatment Records</h2>
+            <div class="space-y-6">
+                <div class="p-4 border rounded-lg bg-white">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-lg font-semibold text-gray-800">Diagnosis</h3>
+                        <button id="generate-ai-diagnosis-btn" class="text-sm bg-purple-500 text-white font-bold py-1 px-3 rounded-lg hover:bg-purple-600 transition"><i class="fas fa-magic"></i> Generate AI Diagnosis</button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="diag-differential" class="block text-sm font-medium text-gray-700">Differential Diagnosis</label>
+                            <textarea id="diag-differential" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="List of possible diagnoses..."></textarea>
+                        </div>
+                        <div>
+                            <label for="diag-definitive" class="block text-sm font-medium text-gray-700">Definitive Diagnosis</label>
+                            <textarea id="diag-definitive" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="The final diagnosis..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4 border rounded-lg bg-white">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-3">Treatment Planning</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div class="md:col-span-1">
+                            <label for="plan-tooth-input" class="block text-sm font-medium text-gray-700">Tooth/Area</label>
+                            <input type="text" id="plan-tooth-input" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="e.g., 16">
+                        </div>
+                         <div class="md:col-span-1">
+                            <label for="plan-code-input" class="block text-sm font-medium text-gray-700">Code</label>
+                            <input type="text" id="plan-code-input" data-prop="code" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="e.g., 8349">
+                        </div>
+                        <div class="md:col-span-2">
+                             <label for="plan-procedure-input" class="block text-sm font-medium text-gray-700">Procedure</label>
+                            <input type="text" id="plan-procedure-input" data-prop="procedure" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="e.g., MOD Composite">
+                        </div>
+                        <div class="md:col-span-4 text-right">
+                             <button id="add-to-plan-btn" class="w-full md:w-auto bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600 transition text-sm"><i class="fas fa-plus"></i> Add to Plan</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4 border rounded-lg bg-white">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-3">General Clinical Notes</h3>
+                    <textarea id="treat-clinical-notes" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                </div>
+                <div class="p-4 border rounded-lg bg-white"><div class="flex justify-between items-center mb-3"><h3 class="text-lg font-semibold text-gray-800">Treatment Plan Summary</h3><button id="generate-ai-plan-btn" class="text-sm bg-purple-500 text-white font-bold py-1 px-3 rounded-lg hover:bg-purple-600 transition"><i class="fas fa-magic"></i> Generate AI Plan</button></div><textarea id="treat-plan" rows="4" class="w-full border-gray-300 rounded-md shadow-sm text-sm" placeholder="AI-generated treatment plan will appear here..."></textarea><div class="mt-4 overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tooth/Area</th><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Planned Procedure</th><th class="px-4 py-2"></th></tr></thead><tbody id="treatment-plan-body" class="bg-white divide-y divide-gray-200"><tr><td colspan="4" class="text-center text-gray-500 p-4">No items in the treatment plan.</td></tr></tbody></table></div></div>
+                <div class="p-4 border rounded-lg bg-white"><div class="flex justify-between items-center mb-3"><h3 class="text-lg font-semibold text-gray-800">Procedure Log</h3><div class="flex gap-2"><button id="generate-combined-handout-btn" class="text-sm bg-purple-500 text-white font-bold py-1 px-3 rounded-lg hover:bg-purple-600 transition"><i class="fas fa-file-alt"></i> Combined Handout</button><button id="add-procedure-btn" class="text-sm bg-blue-500 text-white font-bold py-1 px-3 rounded-lg hover:bg-blue-600 transition"><i class="fas fa-plus"></i> Add Procedure</button></div></div><div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tooth/Area</th><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Procedure</th><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clinician</th><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th><th class="px-4 py-2"></th></tr></thead><tbody id="procedure-log-body" class="bg-white divide-y divide-gray-200"><tr><td colspan="7" class="text-center text-gray-500 p-4">No procedures have been logged.</td></tr></tbody></table></div></div>
+                <div class="p-4 border rounded-lg bg-white"><h3 class="text-lg font-semibold text-gray-800 mb-3">Follow-up</h3><div><label for="treat-followup" class="block text-sm font-medium text-gray-700">Follow-up Instructions & Next Appointment</label><textarea id="treat-followup" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea><div class="mt-1"><button class="quick-btn" data-target="treat-followup">Recall 6 Months</button><button class="quick-btn" data-target="treat-followup">Recall 12 Months</button><button class="quick-btn" data-target="treat-followup">RTC prn</button></div></div></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modals -->
+    <div id="condition-select-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center modal-overlay z-50"><div class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white"><h3 class="text-lg font-medium text-gray-900 mb-4">Select Condition</h3><div id="condition-grid" class="space-y-4 max-h-96 overflow-y-auto"></div><div class="items-center px-4 py-3 mt-4"><button class="modal-cancel px-4 py-2 bg-gray-500 text-white font-medium rounded-md w-full shadow-sm hover:bg-gray-600">Cancel</button></div></div></div>
+    <div id="confirmation-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center modal-overlay z-50"><div class="relative mx-auto p-5 border w-96 shadow-lg rounded-md bg-white"><p id="modal-text" class="text-center"></p><div class="flex justify-center gap-4 mt-4"><button id="modal-confirm" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">OK</button><button class="modal-cancel px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Cancel</button></div></div></div>
+    <div id="comparison-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center modal-overlay z-50"><div class="relative mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white"><h3 class="text-xl font-medium text-gray-900 mb-4">Compare Snapshots</h3><div class="flex justify-center gap-4 mb-4"><select id="compare-select-1" class="w-full rounded-md border-gray-300"></select><span class="self-center font-bold">vs.</span><select id="compare-select-2" class="w-full rounded-md border-gray-300"></select></div><div id="comparison-container" class="max-h-[75vh] overflow-auto"></div><div class="items-center px-4 py-3 mt-4"><button class="modal-cancel px-4 py-2 bg-gray-500 text-white font-medium rounded-md w-full shadow-sm hover:bg-gray-600">Close</button></div></div></div>
+    <div id="statement-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full modal-overlay z-50"><div class="relative top-10 mx-auto w-full max-w-4xl shadow-lg rounded-md bg-white modal-content"><div id="statement-content"></div><div class="px-8 py-4 bg-gray-50 flex justify-end gap-2 no-print"><button id="print-statement-btn" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Print</button><button class="modal-cancel px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Close</button></div></div></div>
+    <div id="referral-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full modal-overlay z-50"><div class="relative top-10 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white modal-content"><div class="p-8"><h2 class="text-2xl font-bold text-center">Referral Form</h2><div class="flex justify-between mt-8"><div><p><strong>From:</strong> S&P Smiles Co.</p><p>123 Dental St, Smile City</p></div><div><p><strong>Date:</strong> <span id="referral-date"></span></p></div></div><div class="mt-6 border-t pt-4"><p><strong>Patient:</strong> <span id="referral-patient-name"></span></p><p><strong>DOB:</strong> <span id="referral-patient-dob"></span></p></div><div class="mt-6"><label class="font-bold">Reason for Referral:</label><textarea class="w-full h-32 border mt-1 p-2 rounded-md"></textarea></div><div class="mt-6"><label class="font-bold">Relevant History:</label><textarea class="w-full h-24 border mt-1 p-2 rounded-md"></textarea></div><div class="mt-6"><label class="font-bold">Referring To:</label><input type="text" class="w-full border mt-1 p-2 rounded-md"></div><div class="mt-12 text-right"><p>Signature: _________________________</p></div></div><div class="px-8 py-4 bg-gray-50 flex justify-end gap-2 no-print"><button id="print-referral-btn" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Print</button><button class="modal-cancel px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Close</button></div></div></div>
+    <div id="outreach-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center modal-overlay z-50"><div class="relative mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-md bg-white"><h3 class="text-lg font-medium text-gray-900 mb-4">Patient Dashboard</h3><input type="text" id="patient-search-input" placeholder="Search by name or ID..." class="w-full p-2 border rounded-md mb-4"><div class="max-h-96 overflow-y-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-4 py-2 text-left">ID</th><th class="px-4 py-2 text-left">Name</th><th class="px-4 py-2 text-left">DOB</th><th class="px-4 py-2 text-left">Actions</th></tr></thead><tbody id="patient-list-body"></tbody></table></div><div class="items-center px-4 py-3 mt-4"><button class="modal-cancel px-4 py-2 bg-gray-500 text-white font-medium rounded-md w-full shadow-sm hover:bg-gray-600">Close</button></div></div></div>
+    <div id="note-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center modal-overlay z-50"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"><h3 id="note-modal-title" class="text-lg font-semibold mb-4">Add Note</h3><textarea id="condition-note-input" rows="5" class="w-full border-gray-300 rounded-md shadow-sm"></textarea><input type="hidden" id="note-tooth-id"><input type="hidden" id="note-surface-id"><div class="mt-4 flex justify-end gap-2"><button class="modal-cancel px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Cancel</button><button id="save-note-btn" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Save Note</button></div></div></div>
+    <div id="appointment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center modal-overlay z-50"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"><h3 id="appointment-modal-title" class="text-lg font-semibold mb-4">Schedule Appointment</h3><div class="space-y-4"><div><label class="block text-sm">Patient</label><input type="text" id="appointment-patient" class="w-full border-gray-300 rounded-md bg-gray-100" readonly></div><div class="grid grid-cols-2 gap-4"><div><label class="block text-sm">Date</label><input type="date" id="appointment-date" class="w-full border-gray-300 rounded-md"></div><div><label class="block text-sm">Start Time</label><input type="time" id="appointment-start-time" class="w-full border-gray-300 rounded-md"></div></div><div><label class="block text-sm">Reason</label><input type="text" id="appointment-reason" class="w-full border-gray-300 rounded-md"></div><div><label class="block text-sm">Notes</label><textarea id="appointment-notes" rows="3" class="w-full border-gray-300 rounded-md"></textarea></div><div class="grid grid-cols-2 gap-4"><div><label class="block text-sm">Duration (minutes)</label><select id="appointment-duration" class="w-full border-gray-300 rounded-md"><option value="15">15</option><option value="30">30</option><option value="45">45</option><option value="60" selected>60</option><option value="90">90</option></select></div><div><label class="block text-sm">Status</label><select id="appointment-status" class="w-full border-gray-300 rounded-md"><option>Scheduled</option><option>Confirmed</option><option>Arrived</option><option>Completed</option><option>No-Show</option></select></div></div></div><input type="hidden" id="appointment-id"><div class="mt-6 flex justify-between"><button id="delete-appointment-btn" class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Delete</button><div class="flex gap-2"><button class="modal-cancel px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Cancel</button><button id="save-appointment-btn" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Save</button></div></div></div></div>
+    <div id="payment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center modal-overlay z-50"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"><h3 class="text-lg font-semibold mb-4">Record Payment</h3><div class="space-y-4"><div><label for="payment-date" class="block text-sm">Payment Date</label><input type="date" id="payment-date" class="w-full border-gray-300 rounded-md"></div><div><label for="payment-amount" class="block text-sm">Amount</label><input type="number" id="payment-amount" class="w-full border-gray-300 rounded-md" placeholder="0.00"></div><div><label for="payment-method" class="block text-sm">Payment Method</label><select id="payment-method" class="w-full border-gray-300 rounded-md"><option>Credit Card</option><option>Cash</option><option>Insurance</option><option>Bank Transfer</option><option>Other</option></select></div><div><label for="payment-notes" class="block text-sm">Notes</label><textarea id="payment-notes" rows="3" class="w-full border-gray-300 rounded-md"></textarea></div></div><div class="mt-6 flex justify-end gap-2"><button class="modal-cancel px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Cancel</button><button id="save-payment-btn" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Save Payment</button></div></div></div>
+    <div id="billing-item-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center modal-overlay z-50"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"><h3 class="text-lg font-semibold mb-4">Add Billing Item</h3><div class="space-y-4"><div><label for="item-date" class="block text-sm">Date</label><input type="date" id="item-date" class="w-full border-gray-300 rounded-md"></div><div><label for="item-description" class="block text-sm">Description</label><input type="text" id="item-description" data-prop="procedure" class="w-full border-gray-300 rounded-md" placeholder="e.g., Periodic oral evaluation"></div><div class="flex items-end gap-2"> <div class="flex-grow"><label for="item-code" class="block text-sm">Procedure Code</label><input type="text" id="item-code" data-prop="code" list="dental-codes-list" class="w-full border-gray-300 rounded-md" placeholder="e.g., 8101"><datalist id="dental-codes-list"></datalist></div><button id="suggest-code-btn" class="px-3 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 text-sm" title="Suggest Code with AI"><i class="fas fa-magic"></i></button></div><div><label for="item-fee" class="block text-sm">Fee (Charge)</label><input type="number" id="item-fee" class="w-full border-gray-300 rounded-md" placeholder="0.00"></div></div><div class="mt-6 flex justify-end gap-2"><button class="modal-cancel px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Cancel</button><button id="save-billing-item-btn" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Save Item</button></div></div></div>
+    <div id="inventory-item-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center modal-overlay z-50"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"><h3 id="inventory-modal-title" class="text-lg font-semibold mb-4">Add Inventory Item</h3><div class="space-y-4"><div><label for="inventory-item-name" class="block text-sm">Item Name</label><input type="text" id="inventory-item-name" class="w-full border-gray-300 rounded-md"></div><div><label for="inventory-item-category" class="block text-sm">Category</label><input type="text" id="inventory-item-category" class="w-full border-gray-300 rounded-md"></div><div><label for="inventory-item-quantity" class="block text-sm">Current Quantity</label><input type="number" id="inventory-item-quantity" class="w-full border-gray-300 rounded-md"></div><div><label for="inventory-item-threshold" class="block text-sm">Low Stock Threshold</label><input type="number" id="inventory-item-threshold" class="w-full border-gray-300 rounded-md"></div><div><label for="inventory-item-supplier" class="block text-sm">Supplier</label><input type="text" id="inventory-item-supplier" class="w-full border-gray-300 rounded-md"></div></div><input type="hidden" id="inventory-item-id"><div class="mt-6 flex justify-end gap-2"><button class="modal-cancel px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Cancel</button><button id="save-inventory-item-btn" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Save</button></div></div></div>
+    <div id="restock-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center modal-overlay z-50"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm"><h3 class="text-lg font-semibold mb-2">Restock Item</h3><p id="restock-item-name" class="mb-4 text-gray-600"></p><div class="space-y-4"><div><label for="restock-quantity" class="block text-sm">Quantity to Add</label><input type="number" id="restock-quantity" class="w-full border-gray-300 rounded-md"></div></div><input type="hidden" id="restock-item-id"><div class="mt-6 flex justify-end gap-2"><button class="modal-cancel px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Cancel</button><button id="confirm-restock-btn" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Confirm</button></div></div></div>
+    <div id="patient-handout-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center modal-overlay z-50"><div class="relative mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white modal-content"><h3 id="handout-modal-title" class="text-xl font-medium text-gray-900 mb-4">Patient Handout</h3><div id="handout-modal-content" class="text-sm text-gray-700 max-h-[60vh] overflow-y-auto p-4 bg-gray-50 rounded"></div><div class="px-4 py-3 mt-4 flex justify-end gap-2 no-print"><button id="print-handout-btn" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Print</button><button class="modal-cancel px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Close</button></div></div></div>
+    <div id="outreach-message-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center modal-overlay z-50"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"><h3 class="text-lg font-semibold mb-4">Generated Outreach Message</h3><textarea id="outreach-message-content" rows="8" class="w-full border-gray-300 rounded-md shadow-sm bg-gray-50" readonly></textarea><div class="mt-4 flex justify-between"><button id="copy-outreach-btn" class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">Copy Text</button><button class="modal-cancel px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Close</button></div></div></div>
+    <div id="ai-code-suggestion-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center modal-overlay z-50"><div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg"><h3 class="text-lg font-semibold mb-4">AI Code Suggestions</h3><div id="ai-code-suggestions-list" class="space-y-2"></div><div class="mt-6 flex justify-end gap-2"><button class="modal-cancel px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Close</button></div></div></div>
+    <div id="billing-from-procedure-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center modal-overlay z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 class="text-lg font-semibold mb-4">Add Procedure to Billing</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Procedure</label>
+                    <p id="bill-proc-description" class="mt-1 p-2 bg-gray-100 rounded-md text-sm"></p>
+                </div>
+                 <div>
+                    <label for="bill-proc-fee" class="block text-sm font-medium text-gray-700">Fee (Charge)</label>
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="bill-proc-fee" class="flex-grow w-full border-gray-300 rounded-md" placeholder="0.00">
+                        <button id="suggest-fee-btn" class="px-3 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 text-sm" title="Suggest Fee with AI"><i class="fas fa-magic"></i></button>
+                    </div>
+                </div>
+            </div>
+            <input type="hidden" id="bill-proc-index">
+            <div class="mt-6 flex justify-end gap-2">
+                <button class="modal-cancel px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Cancel</button>
+                <button id="save-billing-from-procedure-btn" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Add to Billing</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="ai-procedure-suggestion-popup" class="hidden absolute z-[100] w-72 bg-white border rounded-md shadow-lg max-h-60 overflow-y-auto"></div>
+    <div id="note-tooltip" class="hidden absolute z-[100] p-2 text-sm bg-gray-800 text-white rounded-md shadow-lg"></div>
+
+    <!-- SVG Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/snap.svg/0.5.1/snap.svg-min.js"></script>
+    <script type="module" src="index.tsx"></script>
+
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
